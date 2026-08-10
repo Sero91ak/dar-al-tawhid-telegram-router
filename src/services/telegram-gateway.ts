@@ -108,13 +108,21 @@ export class GrammyTelegramGateway implements TelegramGateway {
 }
 
 export function isRetryableTelegramError(error: unknown): { retryAfterSeconds: number | null; code: number | null } {
-  if (!(error instanceof GrammyError)) {
-    return { retryAfterSeconds: null, code: null };
+  if (error instanceof GrammyError) {
+    const retryAfter = typeof error.parameters?.retry_after === "number" ? error.parameters.retry_after : null;
+    return {
+      retryAfterSeconds: retryAfter,
+      code: error.error_code
+    };
   }
 
-  const retryAfter = typeof error.parameters?.retry_after === "number" ? error.parameters.retry_after : null;
-  return {
-    retryAfterSeconds: retryAfter,
-    code: error.error_code
-  };
+  if (typeof error === "object" && error !== null) {
+    const candidate = error as { error_code?: unknown; parameters?: { retry_after?: unknown } };
+    return {
+      retryAfterSeconds: typeof candidate.parameters?.retry_after === "number" ? candidate.parameters.retry_after : null,
+      code: typeof candidate.error_code === "number" ? candidate.error_code : null
+    };
+  }
+
+  return { retryAfterSeconds: null, code: null };
 }

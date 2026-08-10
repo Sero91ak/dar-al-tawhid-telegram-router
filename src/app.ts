@@ -46,7 +46,8 @@ export async function createApp(env: NodeJS.ProcessEnv = process.env) {
     telegram,
     logger,
     targetForumId: String(config.TARGET_FORUM_ID),
-    routingMode: config.ROUTING_MODE
+    routingMode: config.ROUTING_MODE,
+    retryAttempts: 3
   });
 
   const bot = createRouterBot({
@@ -56,6 +57,11 @@ export async function createApp(env: NodeJS.ProcessEnv = process.env) {
     mediaGroupService,
     routingService
   });
+
+  const recoveredAlbums = await mediaGroupService.recoverPendingGroups();
+  for (const envelope of recoveredAlbums) {
+    await routingService.routeSourcePost(envelope);
+  }
 
   const app = fastify({ logger: false });
 

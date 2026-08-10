@@ -90,4 +90,20 @@ describe("routing service", () => {
 
     expect(ctx.telegram.calls[0]?.kind).toBe("forwardAlbum");
   });
+
+  it("retries temporary telegram failures and succeeds once", async () => {
+    await ctx.topicRegistry.register({ category: "aqidah", targetForumId: "-2002", threadId: 106, adminUserId: "7" });
+    ctx.telegram.forwardSingleFailures.push({ error_code: 429, parameters: { retry_after: 0 } });
+
+    const result = await ctx.routingService.routeSourcePost({
+      sourceChatId: "-1001",
+      sourceMessageId: 15,
+      sourceMessageIds: [15],
+      mediaGroupId: null,
+      captionOrText: "#Aqidah"
+    });
+
+    expect(result.successes).toEqual(["aqidah"]);
+    expect(ctx.telegram.calls).toHaveLength(1);
+  });
 });

@@ -18,10 +18,15 @@ export interface RoutingServiceDeps {
   logger: AppLogger;
   targetForumId: string;
   routingMode: "forward" | "copy";
+  retryAttempts?: number;
 }
 
 export class RoutingService {
-  public constructor(private readonly deps: RoutingServiceDeps) {}
+  private readonly retryAttempts: number;
+
+  public constructor(private readonly deps: RoutingServiceDeps) {
+    this.retryAttempts = Math.max(1, deps.retryAttempts ?? 3);
+  }
 
   public async routeSourcePost(envelope: SourcePostEnvelope): Promise<{
     categories: RoutingCategory[];
@@ -76,7 +81,7 @@ export class RoutingService {
       }
 
       try {
-        const destinationMessageId = await this.sendToRoute({
+        const destinationMessageId = await this.sendToRouteWithRetry({
           route,
           sourceChatId: envelope.sourceChatId,
           sourceMessageIds: envelope.sourceMessageIds
@@ -180,4 +185,54 @@ export class RoutingService {
           messageId: primaryMessageId
         });
   }
+
+  private async sendToRouteWithRetry(input: {
+    route: { targetForumId: string; threadId: number };
+    sourceChatId: string;
+    sourceMessageIds: number[];
+  }): Promise<number | null> {
+    let attempt = 0;
+    let lastError: unknown;
+
+    while (attempt < this.retryAttempts) {
+      attempt += 1;
+
+      try {
+        return await this.sendToRoute(input);
+      } catch (error) {
+        lastError = error;
+        const retryMeta = isRetryableTelegramError(error);
+        const canRetry =
+          retryMeta.retryAfterSeconds !== null ||
+          retryMeta.code === 429 ||
+          (retryMeta.code !== null && retryMeta.code >= 500);
+
+        if (!canRetry || attempt >= this.retryAttempts) {
+          throw error;
+        }
+
+        const delayMs = retryMeta.retryAfterSeconds
+          ? retryMeta.retryAfterSeconds * 1000
+          : Math.min(250 * attempt, 1000);
+
+        this.deps.logger.warn(
+          {
+            attempt,
+            delayMs,
+            sourceChatId: input.sourceChatId,
+            destinationThreadId: input.route.threadId
+          },
+          "telegram_route_retry"
+        );
+
+        await sleep(delayMs);
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error("routing failed after retries");
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

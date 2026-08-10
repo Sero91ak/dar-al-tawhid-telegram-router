@@ -9,6 +9,11 @@ export interface StoredMediaGroupItem {
   payloadJson: string;
 }
 
+export interface PendingMediaGroup {
+  sourceChatId: string;
+  mediaGroupId: string;
+}
+
 export class MediaGroupRepository {
   public constructor(private readonly db: Kysely<DatabaseSchema>) {}
 
@@ -52,5 +57,15 @@ export class MediaGroupRepository {
       .where("source_chat_id", "=", sourceChatId)
       .where("media_group_id", "=", mediaGroupId)
       .execute();
+  }
+
+  public async listPendingGroups(): Promise<PendingMediaGroup[]> {
+    const rows = await this.db
+      .selectFrom("media_group_items")
+      .select(["source_chat_id as sourceChatId", "media_group_id as mediaGroupId"])
+      .distinct()
+      .execute();
+
+    return rows;
   }
 }
