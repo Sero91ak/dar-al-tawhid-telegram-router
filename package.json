@@ -14,7 +14,10 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run lint && npm run test && npm run build"
+    "check": "npm run lint && npm run test && npm run build",
+    "env:check": "tsx scripts/check-env.ts",
+    "webhook:set": "tsx scripts/set-webhook.ts",
+    "webhook:delete": "tsx scripts/delete-webhook.ts"
   },
   "dependencies": {
     "@fastify/basic-auth": "^6.0.2",

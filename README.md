@@ -124,6 +124,7 @@ In jedem Zielthema:
 ```bash
 npm install
 cp .env.example .env
+npm run env:check
 npm run dev
 ```
 
@@ -145,6 +146,7 @@ Admin:
 npm run lint
 npm run test
 npm run build
+npm run env:check
 ```
 
 Abgedeckt sind:
@@ -156,6 +158,28 @@ Abgedeckt sind:
 - Forward-/Copy-Modus
 - Media-Album-Routing
 - Health- und Webhook-Schutz
+- Retry bei temporaeren Telegram-Fehlern
+- Recovery fuer Pending-Medienalben
+
+## Webhook-Verwaltung
+
+Webhook setzen:
+
+```bash
+npm run webhook:set
+```
+
+Webhook entfernen:
+
+```bash
+npm run webhook:delete
+```
+
+Voraussetzung:
+
+- `PUBLIC_BASE_URL`
+- `TELEGRAM_BOT_TOKEN`
+- `WEBHOOK_SECRET`
 
 ## Sicherheit
 
@@ -191,10 +215,8 @@ Für den ersten 24/7-Betrieb: **Railway**, **Render** oder **Fly.io** mit Postgr
 
 ## Offene Punkte vor echtem Telegram-Test
 
-- echtes GitHub-Repository anlegen
-- Entwicklungsbranch pushen
-- Pull Request gegen `main` vorbereiten
 - reales BotFather-Token setzen
 - reale Channel-/Forum-IDs setzen
 - Themen in Telegram registrieren
-- optional Admin-Webseite weiter ausbauen
+- produktive PostgreSQL-Datenbank setzen
+- Webhook gegen echte Ziel-URL setzen

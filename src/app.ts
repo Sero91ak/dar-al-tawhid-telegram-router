@@ -1,6 +1,7 @@
 import fastify from "fastify";
 import basicAuth from "@fastify/basic-auth";
 import { webhookCallback } from "grammy";
+import { sql } from "kysely";
 import { loadConfig } from "./config/env.js";
 import { createDatabase } from "./db/index.js";
 import { AppStateRepository } from "./db/repositories/app-state-repository.js";
@@ -46,7 +47,8 @@ export async function createApp(env: NodeJS.ProcessEnv = process.env) {
     telegram,
     logger,
     targetForumId: String(config.TARGET_FORUM_ID),
-    routingMode: config.ROUTING_MODE
+    routingMode: config.ROUTING_MODE,
+    retryAttempts: 3
   });
 
   const bot = createRouterBot({
@@ -56,6 +58,11 @@ export async function createApp(env: NodeJS.ProcessEnv = process.env) {
     mediaGroupService,
     routingService
   });
+
+  const recoveredAlbums = await mediaGroupService.recoverPendingGroups();
+  for (const envelope of recoveredAlbums) {
+    await routingService.routeSourcePost(envelope);
+  }
 
   const app = fastify({ logger: false });
 
@@ -73,11 +80,16 @@ export async function createApp(env: NodeJS.ProcessEnv = process.env) {
   });
 
   app.get("/health", async () => ({
-    status: "ok",
-    uptime: process.uptime(),
-    database: "connected",
-    telegramConfigLoaded: true,
-    timestamp: new Date().toISOString()
+    ...(await (async () => {
+      await sql`select 1`.execute(database.db);
+      return {
+        status: "ok",
+        uptime: process.uptime(),
+        database: "connected",
+        telegramConfigLoaded: true,
+        timestamp: new Date().toISOString()
+      };
+    })())
   }));
 
   app.post("/telegram/webhook", async (request, reply) => {

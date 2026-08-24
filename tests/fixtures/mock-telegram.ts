@@ -5,6 +5,10 @@ export class MockTelegramGateway implements TelegramGateway {
     kind: "forwardSingle" | "copySingle" | "forwardAlbum" | "copyAlbum";
     payload: Record<string, unknown>;
   }> = [];
+  public forwardSingleFailures: unknown[] = [];
+  public copySingleFailures: unknown[] = [];
+  public forwardAlbumFailures: unknown[] = [];
+  public copyAlbumFailures: unknown[] = [];
 
   public async getMe() {
     return { username: "dar_router_bot" };
@@ -16,6 +20,10 @@ export class MockTelegramGateway implements TelegramGateway {
     threadId: number;
     messageId: number;
   }): Promise<number> {
+    const failure = this.forwardSingleFailures.shift();
+    if (failure) {
+      throw failure;
+    }
     this.calls.push({ kind: "forwardSingle", payload: params });
     return 101;
   }
@@ -26,6 +34,10 @@ export class MockTelegramGateway implements TelegramGateway {
     threadId: number;
     messageId: number;
   }): Promise<number> {
+    const failure = this.copySingleFailures.shift();
+    if (failure) {
+      throw failure;
+    }
     this.calls.push({ kind: "copySingle", payload: params });
     return 201;
   }
@@ -36,6 +48,10 @@ export class MockTelegramGateway implements TelegramGateway {
     threadId: number;
     messageIds: number[];
   }): Promise<number | null> {
+    const failure = this.forwardAlbumFailures.shift();
+    if (failure) {
+      throw failure;
+    }
     this.calls.push({ kind: "forwardAlbum", payload: params });
     return 301;
   }
@@ -46,6 +62,10 @@ export class MockTelegramGateway implements TelegramGateway {
     threadId: number;
     messageIds: number[];
   }): Promise<number | null> {
+    const failure = this.copyAlbumFailures.shift();
+    if (failure) {
+      throw failure;
+    }
     this.calls.push({ kind: "copyAlbum", payload: params });
     return 401;
   }

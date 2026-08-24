@@ -49,25 +49,54 @@ export class MediaGroupService {
 
       const timer = setTimeout(async () => {
         this.timers.delete(key);
-        const items = await this.repo.list(input.chatId, input.mediaGroupId ?? "");
-        await this.repo.delete(input.chatId, input.mediaGroupId ?? "");
-        const captionSource = items.find((item) => item.captionOrText.trim().length > 0) ?? items[0];
-
-        this.logger.info(
-          { mediaGroupId: input.mediaGroupId, count: items.length, sourceChatId: input.chatId },
-          "media_group_flushed"
-        );
-
-        resolve({
-          sourceChatId: input.chatId,
-          sourceMessageId: items[0]?.sourceMessageId ?? input.messageId,
-          sourceMessageIds: items.map((item) => item.sourceMessageId),
-          mediaGroupId: input.mediaGroupId,
-          captionOrText: captionSource?.captionOrText ?? ""
-        });
+        resolve(await this.flushGroup(input.chatId, input.mediaGroupId ?? ""));
       }, this.flushDelayMs);
 
       this.timers.set(key, timer);
     });
+  }
+
+  public async recoverPendingGroups(): Promise<SourcePostEnvelope[]> {
+    const groups = await this.repo.listPendingGroups();
+    const envelopes: SourcePostEnvelope[] = [];
+
+    for (const group of groups) {
+      const key = `${group.sourceChatId}:${group.mediaGroupId}`;
+      const activeTimer = this.timers.get(key);
+      if (activeTimer) {
+        clearTimeout(activeTimer);
+        this.timers.delete(key);
+      }
+
+      const envelope = await this.flushGroup(group.sourceChatId, group.mediaGroupId);
+      if (envelope) {
+        envelopes.push(envelope);
+      }
+    }
+
+    return envelopes;
+  }
+
+  private async flushGroup(sourceChatId: string, mediaGroupId: string): Promise<SourcePostEnvelope | null> {
+    const items = await this.repo.list(sourceChatId, mediaGroupId);
+    if (items.length === 0) {
+      return null;
+    }
+
+    await this.repo.delete(sourceChatId, mediaGroupId);
+    const captionSource = items.find((item) => item.captionOrText.trim().length > 0) ?? items[0];
+
+    this.logger.info(
+      { mediaGroupId, count: items.length, sourceChatId },
+      "media_group_flushed"
+    );
+
+    return {
+      sourceChatId,
+      sourceMessageId: items[0]?.sourceMessageId ?? 0,
+      sourceMessageIds: items.map((item) => item.sourceMessageId),
+      mediaGroupId,
+      captionOrText: captionSource?.captionOrText ?? ""
+    };
   }
 }
